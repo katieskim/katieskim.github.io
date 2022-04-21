@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Rochester&family=Sorts+Mill+Goudy:ital@0;1&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<style>
+ canvas{
+     background-color: white;
+ }
+ body {
+     text-align: center;
+     font-family: Rochester;
+     background-color: #eeeeff;
+ }
+ h1 {
+     font-size: 40pt;
+ }
+ p {
+     font-size: 16pt;
+ }
+ h2 {
+     font-size: 24pt;
+ }
+ #score{
+     display: inline-block;
+     width: 30px;
+     text-align: right;
+ }
+
+</style>
+<title>Blur-Skis</title>
+</head>
+<body onload="startGame()">
+<h1>Blur-Skis</h1>
+<p>best with sound</p>
+
+<script>
+
+var playing = false;
+var started = false;
+var score = 0;
+
+var pitch = 40; // pixels
+
+var grid_height = 17; // cells
+var grid_width = 11; // cells
+
+var target_score = 560;
+
+const skier_y = 15
+
+var direction_queue = [0];
+
+function startGame() {
+    myGameArea.start();
+}
+
+var myGameArea = {
+    canvas : document.createElement("canvas"),
+    start : function() {
+        this.canvas.width = grid_width * pitch;
+        this.canvas.height = grid_height * pitch;
+        this.context = this.canvas.getContext("2d");
+        document.getElementById("cancan").appendChild(this.canvas);
+        this.interval = setInterval(updateGameArea, 125); 
+        window.addEventListener('keydown', function (e) {
+            if (!started){
+                playing=true;
+                started=true;
+                document.getElementById("noise").play();
+            }
+            interpretKey(e.keyCode);
+        })
+        this.scoreboard = document.getElementById("score");
+        this.loseboard = document.getElementById("youLose");
+    },
+    clear : function() {
+        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+}
+
+
+function drawBoard() {  // draw the checkerboard background
+    ctx = myGameArea.context;
+    ctx.fillStyle = "#f1f1f1";
+
+    for (x = 0; x < grid_width; x++) {
+        for (y = 0; y < grid_height; y++) {
+            if ((x+y) % 2 === 1) ctx.fillRect(x*pitch, y*pitch, pitch, pitch);
+        }
+    }
+}
+
+function trees() {
+     this.color = "green";
+     this.girth = 20;
+     this.offset = (pitch - this.girth)/2;
+     this.gapAge = 0;
+
+
+     this.newRow = function() {
+         const multiplier = 0.8;
+         const adder = 0.2
+         if ((score < target_score-skier_y-1) && (Math.random() < (score/target_score * multiplier + adder))) {
+             this.gapAge = 0;
+             var result = Array(grid_width).fill(false);
+            result[0] = true;
+            result[grid_width-1] = true;
+             var gapRadius = 0;
+             var gapCenter = Math.floor(Math.random() * (grid_width-2-2*gapRadius)) + 1 + gapRadius;
+            result[gapCenter] = true;
+             return result;
+         } else {
+             this.gapAge++;
+             var result = Array(grid_width).fill(false);
+             result[0] = true;
+             result[grid_width-1] = true;
+             return result;
+         }
+     }
+
+     this.relocate = function() {
+         for (let y = grid_height-1; y > 0; y--) {
+             this.treeplaces[y] = this.treeplaces[y-1];
+         }
+         this.treeplaces[0] = this.newRow();
+     }
+
+     this.treeplaces = [...Array(grid_height)].map(e => this.newRow());
+
+     this.draw = function() {
+         ctx = myGameArea.context;
+         ctx.fillStyle = this.color;
+
+         for (let y = 0; y < grid_height; y++){
+             for (let x = 0; x < grid_width; x++){
+                 if (this.treeplaces[y][x] === true) {
+                     ctx.fillRect(x * pitch + this.offset, y * pitch + this.offset, this.girth, this.girth);
+                 }
+             }
+         }
+     }
+}
+
+//function food(coords) {
+//    [this.x, this.y] = coords
+//
+//    this.color = "blue"
+//    this.girth = 20;
+//    this.offset = (pitch - this.girth)/2
+//
+//    this.draw = function() {
+//        ctx = myGameArea.context;
+//        ctx.fillStyle = this.color;
+//        
+//        ctx.fillRect(this.x * pitch + this.offset, this.y * pitch + this.offset, this.girth, this.girth)
+//    }
+//
+//    this.relocate = function() {
+//        this.x += 3;
+//        this.y *= 2;
+//
+//        this.x = this.x % grid_width;
+//        this.y = this.y % grid_height;
+//    }
+//}
+
+function snake() {
+    this.head_color = "blue";
+    this.girth = 30;
+    this.offset = (pitch - this.girth)/2
+
+     this.x = (grid_width-1)/2;
+     this.y = skier_y;
+    this.draw = function() {
+        ctx = myGameArea.context;
+        ctx.fillStyle = this.head_color;
+
+        
+        
+        ctx.beginPath();
+        ctx.arc((this.x + 0.5) * pitch, (this.y + 0.5) * pitch, this.girth/2, 0, 2*Math.PI)
+        ctx.fill();
+
+        ctx.fillStyle = this.color;
+        ctx.fillRect((2*this.x + this.x)/3 * pitch + this.offset, (2*this.y + this.y+1)/3 * pitch + this.offset, this.girth, this.girth);
+    }
+
+    this.move = function(direction) {
+        this.x += direction;
+    }
+
+    this.test_collision = function() {
+        return treez.treeplaces[this.y][this.x];
+    }
+
+    //this.test_food = function(foood) {
+    //    [headx, heady] = this.coords[0]
+    //    if (headx === foood.x && heady === foood.y) return true;
+    //    return false;
+    //}
+}
+
+
+
+function startGame() {
+  myGameArea.start();
+}
+
+function add_direction(i) {
+    direction_queue.push(i);
+}
+
+function interpretKey(code) {
+    if (code === 37) add_direction(-1); //  <
+    if (code === 39) add_direction(1); //  >
+}
+
+//var foood = new food([3, 7]);
+
+ var snek = new snake();
+var treez = new trees();
+
+function updateGameArea() { 
+    myGameArea.clear();
+
+    //drawBoard();
+
+     
+    if (playing) {
+        if (direction_queue.length > 1) snek.move(direction_queue.pop());
+        if (snek.test_collision()) lose();
+        myGameArea.scoreboard.innerHTML = score
+        if (score === target_score) win();
+    }
+
+     if (playing) {
+         treez.relocate();
+         score++;
+     }
+    
+
+    snek.draw();
+    treez.draw();
+}
+
+function lose() {
+    console.log("you lose.");
+    myGameArea.loseboard.innerHTML = "awr nawr. you hit a tree. :("
+    playing = false;
+    document.getElementById("noise").pause();
+}
+
+ function win() {
+     console.log("you win!");
+     myGameArea.loseboard.innerHTML = "You win! The secret is blah blah blah"
+     playing = false;
+ }
+ 
+</script>
+
+<div id="cancan"></div>
+<p>Score: <span id="score">0</span></p>
+<h2><span id="youLose"></span></h2>
+
+<audio id="noise">
+    <source src="blursk.mp3" type="audio/mpeg">
+    Your browser does not support the audio element.
+</audio>
+
+</body>
+</html>
