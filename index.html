@@ -26,6 +26,7 @@
              width: 360px;
              margin: auto;
              z-index: 100;
+             font-style: italic;
          }
          #introInnerContainer {
              height: 640px;
@@ -39,13 +40,13 @@
              padding: 10px;
              padding-top: 5px;
              vertical-align: top;
+             font-style: normal;
          }
          h1 {
              font-size: 40pt;
              font-family: Rochester;
          }
          p {
-             font-style: italic;
              font-size: 16pt;
          }
          h2 {
@@ -55,11 +56,17 @@
          }
          #score{
              display: inline-block;
-             width: 30px;
+             width: 35px;
              text-align: right;
          }
          .nope{
              display: none;
+         }
+         .poem > p{
+             font-size: 16pt;
+             margin-top: 0;
+             margin-bottom: 0;
+             font-style: italic;
          }
 
         </style>
@@ -74,7 +81,7 @@
                     <p>
                         Fernzang's vision is so blurry that he can barely see the skis on his paws: he needs your help if he wants to make it down the hill in one piece!</p>
 
-                    <p>Best with sound.</p></div>
+                    <p>Use &lt; &gt; to control. Best with sound.</p></div>
 
 
                 <div id="message"></div>
@@ -86,223 +93,224 @@
         <p>Score: <span id="score">0</span>/600</p>
 
         <audio id="music">
-            <source src="blursk2.mp3" type="audio/mpeg">
+            <source src="blurskis.mp3" type="audio/mpeg">
         </audio>
         <img class="nope" id="fz" src="fz.png">
         <img class="nope" id="treeUp" src="treeUp.png">
         <img class="nope" id="treeLeft" src="treeLeft.png">
         <img class="nope" id="treeRight" src="treeRight.png">
 
-<script>
+        <script>
 
-var playing = false; // is the game running?
-var started = false; // have we passed the title screen?
-var won = false; //have we won?
-var score = 0;
+         var playing = false; // is the game running?
+         var started = false; // have we passed the title screen?
+         var won = false; //have we won?
+         var score = 0;
 
-var pitch = 40; // pixels per cell
+         var pitch = 40; // pixels per cell
 
-var grid_height = 17; // cells
-var grid_width = 11; // cells
+         var grid_height = 17; // cells
+         var grid_width = 11; // cells
 
-var target_score = 600;
+         var target_score = 600;
 
-const skier_y = 15 // which row is the skier on?
-var reload_delay;
+         const skier_y = 15 // which row is the skier on?
+         var reload_delay;
 
-var direction_queue = [];
+         var direction_queue = [];
 
-var fz;
-var tree_up;
-var tree_left;
-var tree_right;
+         var fz;
+         var tree_up;
+         var tree_left;
+         var tree_right;
 
-function start_game() {
-    game_area.start();
-}
+         function start_game() {
+             game_area.start();
+         }
 
-var game_area = {
-    canvas : document.createElement("canvas"),
-    start : function() {
-        this.canvas.width = grid_width * pitch;
-        this.canvas.height = grid_height * pitch;
-        this.context = this.canvas.getContext("2d");
-        document.getElementById("cancan").appendChild(this.canvas);
-        this.interval = setInterval(updateGameArea, 125); // frame length in ms; chosen to match the length of the song. We can adjust this and the target score slightly to fit the music.
+         var game_area = {
+             canvas : document.createElement("canvas"),
+             start : function() {
+                 this.canvas.width = grid_width * pitch;
+                 this.canvas.height = grid_height * pitch;
+                 this.context = this.canvas.getContext("2d");
+                 document.getElementById("cancan").appendChild(this.canvas);
+                 this.interval = setInterval(updateGameArea, 15000/128); // frame length in ms; chosen to match the length of the song. We can adjust this and the target score slightly to fit the music.
 
-        window.addEventListener('keydown', function (e) {
-            if (!started){
-                playing=true;
-                started=true;
-                document.getElementById("intro").style.display = "none"; // hide the intro text
-                document.getElementById("music").play(); // start the music
-            }
-            if (started && !playing && reload_delay <= 0){
-                location.reload(false); // if a key is pressed after the game ends, and the reload delay has elapsed (so the player doesn't reload accidentally), reload the page---from cache, if possible. the proper thing to do would be to just reinitialize all the values but i'm lazy
-            }
-            interpret_key(e.keyCode);
-        })
-        this.scoreboard = document.getElementById("score");
-        this.win_lose_message = document.getElementById("message");
+                 window.addEventListener('keydown', function (e) {
+                     if (!started){
+                         playing=true;
+                         started=true;
+                         document.getElementById("intro").style.display = "none"; // hide the intro text
+                         document.getElementById("music").play(); // start the music
+                     }
+                     if (started && !playing && reload_delay <= 0){
+                         location.reload(false); // if a key is pressed after the game ends, and the reload delay has elapsed (so the player doesn't reload accidentally), reload the page---from cache, if possible. the proper thing to do would be to just reinitialize all the values but i'm lazy
+                     }
+                     interpret_key(e.keyCode);
+                 })
+                 this.scoreboard = document.getElementById("score");
+                 this.win_lose_message = document.getElementById("message");
 
-        fz = document.getElementById("fz");
-        tree_up = document.getElementById("treeUp");
-        tree_left = document.getElementById("treeLeft");
-        tree_right = document.getElementById("treeRight");
-    },
-    clear : function() {
-        this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    }
-}
-
-
-function trees() {
-    this.color = "#046865";
-    this.girth = 20;
-    this.offset = (pitch - this.girth)/2;
-    this.gapAge = 0;
+                 fz = document.getElementById("fz");
+                 tree_up = document.getElementById("treeUp");
+                 tree_left = document.getElementById("treeLeft");
+                 tree_right = document.getElementById("treeRight");
+             },
+             clear : function() {
+                 this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+             }
+         }
 
 
-    this.newRow = function() {
-        const multiplier = 0.333; // proportional to the frequency of trees. Increase to make harder.
-
-        // initialize the row to be empty, except for trees on the right and left
-        var result = Array(grid_width).fill(false);
-        result[0] = true;
-        result[grid_width-1] = true;
-
-        // if we're not after the end of the course, maybe add a tree
-        if ((score < target_score-skier_y-1) && (Math.random() < (Math.sqrt(score/target_score) * multiplier))) {
-            // add a tree in a random position
-            var tree_position = Math.floor(Math.random() * (grid_width-2)) + 1;
-            result[tree_position] = true;
-        }
-        return result;
-    }
-
-    this.move_trees_down = function() {
-        for (let y = grid_height-1; y > 0; y--) {
-            this.tree_positions[y] = this.tree_positions[y-1]; // advance all the trees
-        }
-        this.tree_positions[0] = this.newRow(); // and generate a new row at the top
-    }
-
-    this.tree_positions = [...Array(grid_height)].map(e => this.newRow()); // build the grid of trees
-
-    this.draw = function() {
-        // initialize the drawing stuff
-        ctx = game_area.context;
-        ctx.fillStyle = this.color;
-
-        for (let y = 0; y < grid_height; y++){
-            for (let x = 0; x < grid_width; x++){
-                // make a square
-                if (this.tree_positions[y][x] === true) {
-                    tree = [tree_up, tree_left, tree_right][choreography()];
-                    ctx.drawImage(tree, x * pitch, y * pitch);
-                }
-            }
-        }
-    }
-}
-
-function choreography() {
-     if (!playing) return 0;
-     else if (((score-4)%16) < 8) return 1;
-     else return 2;
-}
+         function trees() {
+             this.color = "#046865";
+             this.girth = 20;
+             this.offset = (pitch - this.girth)/2;
+             this.gapAge = 0;
 
 
-function player_sprite() {
-    // drawing stuff
-    this.head_color = "#C52184";
-    this.girth = 30;
-    this.offset = (pitch - this.girth)/2
+             this.newRow = function() {
+                 const multiplier = 0.333; // proportional to the frequency of trees. Increase to make harder.
 
-    // start the skier in the middle
-    this.x = (grid_width-1)/2;
-    this.y = skier_y;
+                 // initialize the row to be empty, except for trees on the right and left
+                 var result = Array(grid_width).fill(false);
+                 result[0] = true;
+                 result[grid_width-1] = true;
 
+                 // if we're not after the end of the course, maybe add a tree
+                 if ((score < target_score-skier_y-1) && (Math.random() < (Math.sqrt(score/target_score) * multiplier))) {
+                     // add a tree in a random position
+                     var tree_position = Math.floor(Math.random() * (grid_width-2)) + 1;
+                     result[tree_position] = true;
+                 }
+                 return result;
+             }
 
-    this.draw = function() { // we can replace this with something to include an image
-        ctx = game_area.context;
-        const x_offset = -12;
-        const y_offset = 0;
-        if (!won) ctx.drawImage(fz, this.x*pitch+x_offset, this.y*pitch+y_offset);
-        else ctx.drawImage(fz, this.x*pitch+x_offset, this.y*pitch+y_offset + 200 - 2*Math.min(100, reload_delay+60));
-    }
+             this.move_trees_down = function() {
+                 for (let y = grid_height-1; y > 0; y--) {
+                     this.tree_positions[y] = this.tree_positions[y-1]; // advance all the trees
+                 }
+                 this.tree_positions[0] = this.newRow(); // and generate a new row at the top
+             }
 
-    this.move = function(direction) {
-        this.x += direction;
-    }
+             this.tree_positions = [...Array(grid_height)].map(e => this.newRow()); // build the grid of trees
 
-    this.test_collision = function() {
-        return treez.tree_positions[this.y][this.x];
-    }
+             this.draw = function() {
+                 // initialize the drawing stuff
+                 ctx = game_area.context;
+                 ctx.fillStyle = this.color;
 
-}
+                 for (let y = 0; y < grid_height; y++){
+                     for (let x = 0; x < grid_width; x++){
+                         // make a square
+                         if (this.tree_positions[y][x] === true) {
+                             tree = [tree_up, tree_left, tree_right][choreography()];
+                             ctx.drawImage(tree, x * pitch, y * pitch);
+                         }
+                     }
+                 }
+             }
+         }
 
-
-
-function start_game() {
-    game_area.start();
-}
-
-function interpret_key(code) {
-     if (code === 37) direction_queue.push(-1); //  left arrow
-    if (code === 39) direction_queue.push(1); //  right arrow
-}
-
-var skier = new player_sprite();
-var treez = new trees();
-
-function updateGameArea() { 
-    game_area.clear();
-
-    if (playing) {
-        if (direction_queue.length > 1) skier.move(direction_queue.pop());
-        if (skier.test_collision()) lose();
-        game_area.scoreboard.innerHTML = score
-        if (score === target_score) win();
-    }
-    // check again if we're still playing; we don't want to move again if we've won or lost
-    if (playing) {
-        treez.move_trees_down(); // move the trees down
-        score++;
-    } else if (started) {
-        reload_delay -= 1;
-    }
-
-    treez.draw();
-    skier.draw();
-}
-
-function lose() {
-    reload_delay = 8; // don't let the player reload for ~1 second, so they don't do so by accident
-
-    // display the message
-    document.getElementById("message").style.display = "block";
-    game_area.win_lose_message.innerHTML = "<h2>awr nawr. fernzang hit a tree. :("
-
-    playing = false;
-    document.getElementById("music").pause();
-}
-
-function win() {
-    reload_delay = 100; // don't let the player reload for ~5 seconds, so they don't do so by accident
-
-    won = true;
-
-    // display the message
-    document.getElementById("message").style.display = "block";
-    game_area.win_lose_message.innerHTML = "<h2>You did it!</h2><p>Fernzang made it to the end of the slope!</p><p>Unfortunately, Kt and Ct were too fast, and they've recaptured Fernzang. But he's had time to leave you a clue: </p><p><em>blah blah blah</em><p>";
+         function choreography() {
+             if (!playing) return 0;
+             else if (score <= 448) return ((((score)%16) < 8) ? 1 : 2);
+             else if (score <= 508) return ((((score-2)%7.5) < 4) ? 1 : 2);
+             else return ((((score) %8) < 4) ? 1 : 2);
+             }
 
 
-    playing = false;
-    // don't have to stop the music because it's ending anyway
-}
+             function player_sprite() {
+                 // drawing stuff
+                 this.head_color = "#C52184";
+                 this.girth = 30;
+                 this.offset = (pitch - this.girth)/2
 
-</script>
+                 // start the skier in the middle
+                 this.x = (grid_width-1)/2;
+                 this.y = skier_y;
+
+
+                 this.draw = function() { // we can replace this with something to include an image
+                     ctx = game_area.context;
+                     const x_offset = -12;
+                     const y_offset = 0;
+                     if (!won) ctx.drawImage(fz, this.x*pitch+x_offset, this.y*pitch+y_offset);
+                     else ctx.drawImage(fz, this.x*pitch+x_offset, this.y*pitch+y_offset + 200 - 2*Math.min(100, reload_delay+60));
+                 }
+
+                 this.move = function(direction) {
+                     this.x += direction;
+                 }
+
+                 this.test_collision = function() {
+                     return treez.tree_positions[this.y][this.x];
+                 }
+
+             }
+
+
+
+             function start_game() {
+                 game_area.start();
+             }
+
+             function interpret_key(code) {
+                 if (code === 37) direction_queue.push(-1); //  left arrow
+                 if (code === 39) direction_queue.push(1); //  right arrow
+             }
+
+             var skier = new player_sprite();
+             var treez = new trees();
+
+             function updateGameArea() { 
+                 game_area.clear();
+
+                 if (playing) {
+                     if (direction_queue.length > 1) skier.move(direction_queue.pop());
+                     if (skier.test_collision()) lose();
+                     game_area.scoreboard.innerHTML = score
+                     if (score === target_score) win();
+                 }
+                 // check again if we're still playing; we don't want to move again if we've won or lost
+                 if (playing) {
+                     treez.move_trees_down(); // move the trees down
+                     score++;
+                 } else if (started) {
+                     reload_delay -= 1;
+                 }
+
+                 treez.draw();
+                 skier.draw();
+             }
+
+             function lose() {
+                 reload_delay = 8; // don't let the player reload for ~1 second, so they don't do so by accident
+
+                 // display the message
+                 document.getElementById("message").style.display = "block";
+                 game_area.win_lose_message.innerHTML = "<h2>awr nawr. fernzang hit a tree. :("
+
+                 playing = false;
+                 document.getElementById("music").pause();
+             }
+
+             function win() {
+                 reload_delay = 100; // don't let the player reload for ~5 seconds, so they don't do so by accident
+
+                 won = true;
+
+                 // display the message
+                 document.getElementById("message").style.display = "block";
+                 game_area.win_lose_message.innerHTML = "<h2>You did it!</h2><p>Fernzang made it to the end of the slope!</p><p>Unfortunately, KT and CT were too fast, and they've recaptured Fernzang. But he's had time to leave you the following message:</p><div class=\"poem\"><p>They're hot on my trail, </p><p>and they keep getting hotter;</p><p>But we can prevail! </p><p>Hurry toward Alma Mater,</p><p>A guest you'll regale </p><p>with a song, as you oughter,</p><p>And KT will fail, </p><p>as will CT (that rotter).<p></div>";
+
+
+                 playing = false;
+                 // don't have to stop the music because it's ending anyway
+             }
+
+        </script>
 
 
     </body>
