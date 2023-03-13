@@ -107,6 +107,10 @@ blockquote, q {
 #one p {
 	text-align: center;
 }
+/* 
+#resume {
+	display: inline-block;
+} */
 
 	blockquote:before, blockquote:after, q:before, q:after {
 		content: '';
